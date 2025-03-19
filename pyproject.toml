@@ -26,13 +26,11 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "nvidia-cosmos"
 version = "1.0.3"
-authors = [
-    {name = "NVIDIA Corporation"},
-]
+authors = [{ name = "NVIDIA Corporation" }]
 description = "Cosmos World Foundation Model"
 readme = "README.md"
 requires-python = ">=3.10"
-license = {text = "Apache-2.0"}
+license = { text = "Apache-2.0" }
 dynamic = ["dependencies"]
 
 [project.urls]
@@ -40,10 +38,10 @@ homepage = "https://github.com/nvidia-cosmos/cosmos-predict1/"
 issues = "https://github.com/nvidia-cosmos/cosmos-predict1/issues"
 
 [tool.setuptools.dynamic]
-dependencies = {file = ["requirements.txt"]}
+dependencies = { file = ["requirements.txt"] }
 
 [tool.setuptools]
-packages = ["cosmos1"]
+packages = ["cosmos_predict1"]
 
 [tool.isort]
 profile = "black"
@@ -65,5 +63,5 @@ omit = [
     ".venv/*",
     "**/test_*.py",
     "config.py",
-    "config-3.10.py"
+    "config-3.10.py",
 ]
