@@ -44,8 +44,11 @@ def get_sampler(dataset):
 
 cs = ConfigStore.instance()
 
-num_frames = 121
-example_video_dataset = L(Dataset)(
+n_length = 15
+num_frames = 8 * n_length + 1  # 121
+
+# HDVILA example
+example_video_dataset_hdvila = L(Dataset)(
     dataset_dir="datasets/hdvila",
     sequence_interval=1,
     num_frames=num_frames,
@@ -53,17 +56,27 @@ example_video_dataset = L(Dataset)(
     start_frame_interval=1,
 )
 
-dataloader_train = L(DataLoader)(
-    dataset=example_video_dataset,
-    sampler=L(get_sampler)(dataset=example_video_dataset),
+dataloader_train_hdvila = L(DataLoader)(
+    dataset=example_video_dataset_hdvila,
+    sampler=L(get_sampler)(dataset=example_video_dataset_hdvila),
     batch_size=1,
     drop_last=True,
     pin_memory=True,
     num_workers=8,
 )
-dataloader_val = L(DataLoader)(
-    dataset=example_video_dataset,
-    sampler=L(get_sampler)(dataset=example_video_dataset),
+
+# Cosmos-NeMo-Assets example
+example_video_dataset_cosmos_nemo_assets = L(Dataset)(
+    dataset_dir="datasets/cosmos_nemo_assets",
+    sequence_interval=1,
+    num_frames=num_frames,
+    video_size=(720, 1280),
+    start_frame_interval=1,
+)
+
+dataloader_train_cosmos_nemo_assets = L(DataLoader)(
+    dataset=example_video_dataset_cosmos_nemo_assets,
+    sampler=L(get_sampler)(dataset=example_video_dataset_cosmos_nemo_assets),
     batch_size=1,
     drop_last=True,
     pin_memory=True,
@@ -95,7 +108,6 @@ dataloader_val_cosmos_nemo_assets = L(DataLoader)(
     pin_memory=True,
     num_workers=8,
 )
-
 
 video2world_7b_example_hdvila = LazyDict(
     dict(
@@ -148,7 +160,7 @@ video2world_7b_example_hdvila = LazyDict(
         model_parallel=dict(
             sequence_parallel=False,
             tensor_model_parallel_size=1,
-            context_parallel_size=1,
+            context_parallel_size=8,
         ),
         model=dict(
             latent_shape=[
@@ -164,8 +176,7 @@ video2world_7b_example_hdvila = LazyDict(
             fsdp_enabled=True,
             fsdp=dict(
                 policy="block",
-                # checkpoint=False,
-                checkpoint=True,
+                checkpoint=False,
                 min_num_params=1024,
                 sharding_group_size=32,
                 sharding_strategy="hybrid",
@@ -205,7 +216,120 @@ video2world_7b_example_hdvila = LazyDict(
             f_max=[1.0],
             f_min=[1.0],
         ),
-        dataloader_train=dataloader_train,
+        dataloader_train=dataloader_train_hdvila,
+    )
+)
+
+
+video2world_7b_example_cosmos_nemo_assets = LazyDict(
+    dict(
+        defaults=[
+            {"override /net": "faditv2_7b"},
+            {"override /conditioner": "video_cond"},
+            {"override /ckpt_klass": "fsdp"},
+            {"override /checkpoint": "local"},
+            {"override /vae": "cosmos_diffusion_tokenizer_comp8x8x8"},
+            "_self_",
+        ],
+        job=dict(
+            project="posttraining",
+            group="diffusion_video2world",
+            name="video2world_7b_example_cosmos_nemo_assets",
+        ),
+        optimizer=dict(
+            # lr=2 ** (-14.3),  # 2**(-14.3) approx 5e-5
+            lr=0.0,
+            weight_decay=0.1,
+            betas=[0.9, 0.99],
+            eps=1e-10,
+        ),
+        checkpoint=dict(
+            save_iter=200,
+            # save_iter=1,
+            broadcast_via_filesystem=False,
+            load_path="checkpoints/Cosmos-Predict1-7B-Video2World/model.pt",
+            load_training_state=False,
+            strict_resume=False,
+            keys_not_to_resume=[],
+        ),
+        trainer=dict(
+            max_iter=2000,
+            # max_iter=2,
+            distributed_parallelism="fsdp",
+            logging_iter=200,
+            callbacks=dict(
+                grad_clip=L(GradClip)(
+                    model_key="model",
+                    fsdp_enabled=True,
+                ),
+                low_prec=L(LowPrecisionCallback)(config=PLACEHOLDER, trainer=PLACEHOLDER, update_iter=1),
+                iter_speed=L(IterSpeed)(
+                    every_n=10,
+                    hit_thres=0,
+                ),
+                progress_bar=L(ProgressBarCallback)(),
+            ),
+        ),
+        model_parallel=dict(
+            sequence_parallel=False,
+            tensor_model_parallel_size=1,
+            context_parallel_size=8,
+        ),
+        model=dict(
+            latent_shape=[
+                16,
+                16,
+                88,
+                160,
+            ],
+            loss_reduce="mean",
+            ema=dict(
+                enabled=True,
+            ),
+            fsdp_enabled=True,
+            fsdp=dict(
+                policy="block",
+                checkpoint=False,
+                min_num_params=1024,
+                sharding_group_size=32,
+                sharding_strategy="hybrid",
+            ),
+            net=L(VideoExtendGeneralDIT)(
+                rope_h_extrapolation_ratio=1,
+                rope_w_extrapolation_ratio=1,
+                rope_t_extrapolation_ratio=2,
+            ),
+            adjust_video_noise=True,
+            conditioner=dict(
+                video_cond_bool=dict(
+                    condition_location="first_random_n",
+                    cfg_unconditional_type="zero_condition_region_condition_mask",
+                    apply_corruption_to_condition_region="noise_with_sigma",
+                    condition_on_augment_sigma=False,
+                    dropout_rate=0.0,  # No dropout
+                    first_random_n_num_condition_t_max=2,
+                    normalize_condition_latent=False,
+                    # Let the augment sigma mostly fall in the range of 0 to 0.3
+                    augment_sigma_sample_p_mean=-3.0,
+                    augment_sigma_sample_p_std=2.0,
+                    augment_sigma_sample_multiplier=1.0,
+                )
+            ),
+            vae=dict(pixel_chunk_duration=num_frames),
+        ),
+        model_obj=L(FSDPExtendDiffusionModel)(
+            config=PLACEHOLDER,
+            fsdp_checkpointer=PLACEHOLDER,
+        ),
+        # warming up for first 2500 steps~(when resume from 310000)
+        scheduler=dict(
+            warm_up_steps=[2500],
+            cycle_lengths=[10000000000000],
+            f_start=[1.0e-6],
+            f_max=[1.0],
+            f_min=[1.0],
+        ),
+        dataloader_train=dataloader_train_cosmos_nemo_assets,
     )
 )
 
@@ -314,6 +438,7 @@ def register_experiments(cs):
     # Register the experiments
     for _item in [
         video2world_7b_example_hdvila,
+        video2world_7b_example_cosmos_nemo_assets,
         video2world_7b_lora_example_cosmos_nemo_assets,
     ]:
         experiment_name = _item["job"]["name"]
