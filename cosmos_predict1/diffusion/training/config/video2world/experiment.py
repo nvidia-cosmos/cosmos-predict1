@@ -59,6 +59,7 @@ dataloader_train = L(DataLoader)(
     drop_last=True,
     pin_memory=True,
     num_workers=8,
+    num_workers=8,
 )
 dataloader_val = L(DataLoader)(
     dataset=example_video_dataset,
@@ -69,30 +70,13 @@ dataloader_val = L(DataLoader)(
     num_workers=8,
 )
 
-example_video_dataset_cosmos_nemo_assets = L(Dataset)(
-    dataset_dir="datasets/cosmos_nemo_assets",
-    sequence_interval=1,
-    num_frames=num_frames,
-    video_size=(480, 848),
-    start_frame_interval=1,
-)
-
-dataloader_train_cosmos_nemo_assets = L(DataLoader)(
-    dataset=example_video_dataset_cosmos_nemo_assets,
-    sampler=L(get_sampler)(dataset=example_video_dataset_cosmos_nemo_assets),
-    batch_size=1,
-    drop_last=True,
-    pin_memory=True,
-    num_workers=8
-)
-
 dataloader_val_cosmos_nemo_assets = L(DataLoader)(
     dataset=example_video_dataset_cosmos_nemo_assets,
     sampler=L(get_sampler)(dataset=example_video_dataset_cosmos_nemo_assets),
     batch_size=1,
     drop_last=True,
     pin_memory=True,
-    num_workers=8
+    num_workers=8,
 )
 
 
