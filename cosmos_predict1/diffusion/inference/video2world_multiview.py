@@ -21,6 +21,7 @@ import torch
 from cosmos_predict1.diffusion.inference.inference_utils import (
     add_common_arguments,
     check_input_frames,
+    get_input_sizes,
     remove_argument,
     validate_args,
 )
@@ -203,6 +204,8 @@ def demo(args):
         # Check input frames
         if not check_input_frames(current_image_or_video_path, args.num_input_frames):
             continue
+        log.warning("Visual input is provided, overriding --height and --width arguments.")
+        args.height, args.width = get_input_sizes(current_image_or_video_path)
 
         # Generate video
         generated_output = pipeline.generate(
