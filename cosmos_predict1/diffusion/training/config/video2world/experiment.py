@@ -31,6 +31,7 @@ from cosmos_predict1.utils.lazy_config import LazyDict
 from cosmos_predict1.diffusion.training.models.model_peft import PEFTExtendDiffusionModel
 from cosmos_predict1.diffusion.training.utils.peft.lora_config import get_fa_ca_qv_lora_config
 
+
 def get_sampler(dataset):
     return DistributedSampler(
         dataset,
@@ -58,7 +59,7 @@ dataloader_train = L(DataLoader)(
     batch_size=1,
     drop_last=True,
     pin_memory=True,
-    num_workers=8
+    num_workers=8,
 )
 dataloader_val = L(DataLoader)(
     dataset=example_video_dataset,
@@ -66,7 +67,7 @@ dataloader_val = L(DataLoader)(
     batch_size=1,
     drop_last=True,
     pin_memory=True,
-    num_workers=8
+    num_workers=8,
 )
 
 example_video_dataset_cosmos_nemo_assets = L(Dataset)(
@@ -83,7 +84,7 @@ dataloader_train_cosmos_nemo_assets = L(DataLoader)(
     batch_size=1,
     drop_last=True,
     pin_memory=True,
-    num_workers=8
+    num_workers=8,
 )
 
 dataloader_val_cosmos_nemo_assets = L(DataLoader)(
@@ -92,7 +93,7 @@ dataloader_val_cosmos_nemo_assets = L(DataLoader)(
     batch_size=1,
     drop_last=True,
     pin_memory=True,
-    num_workers=8
+    num_workers=8,
 )
 
 
@@ -274,8 +275,6 @@ video2world_7b_lora_example_cosmos_nemo_assets = LazyDict(
             ),
             fsdp_enabled=False,
             net=L(VideoExtendGeneralDIT)(
-                extra_per_block_abs_pos_emb=True,
-                extra_per_block_abs_pos_emb_type="learnable",
                 rope_h_extrapolation_ratio=1,
                 rope_w_extrapolation_ratio=1,
                 rope_t_extrapolation_ratio=2,

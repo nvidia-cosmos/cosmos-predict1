@@ -279,8 +279,6 @@ text2world_7b_example_hdvila = LazyDict(
             ),
             net=dict(
                 in_channels=16,
-                extra_per_block_abs_pos_emb=True,
-                extra_per_block_abs_pos_emb_type="learnable",
                 rope_h_extrapolation_ratio=1,
                 rope_w_extrapolation_ratio=1,
                 rope_t_extrapolation_ratio=2,
@@ -380,7 +378,6 @@ text2world_14b_example_hdvila = LazyDict(
             ),
             net=dict(
                 in_channels=16,
-                extra_per_block_abs_pos_emb=True,
                 rope_h_extrapolation_ratio=2.0,
                 rope_t_extrapolation_ratio=2.0,
                 rope_w_extrapolation_ratio=2.0,
@@ -388,7 +385,6 @@ text2world_14b_example_hdvila = LazyDict(
                 extra_t_extrapolation_ratio=2.0,
                 extra_w_extrapolation_ratio=2.0,
                 use_memory_save=True,
-                extra_per_block_abs_pos_emb_type="learnable",
             ),
             adjust_video_noise=True,
             vae=dict(pixel_chunk_duration=num_frames),
@@ -483,8 +479,6 @@ text2world_7b_example_cosmos_nemo_assets = LazyDict(
             ),
             net=dict(
                 in_channels=16,
-                extra_per_block_abs_pos_emb=True,
-                extra_per_block_abs_pos_emb_type="learnable",
                 rope_h_extrapolation_ratio=1,
                 rope_w_extrapolation_ratio=1,
                 rope_t_extrapolation_ratio=2,
@@ -587,8 +581,6 @@ text2world_7b_example_cosmos_nemo_assets_4gpu_40gb = LazyDict(
             ),
             net=dict(
                 in_channels=16,
-                extra_per_block_abs_pos_emb=True,
-                extra_per_block_abs_pos_emb_type="learnable",
                 rope_h_extrapolation_ratio=1,
                 rope_w_extrapolation_ratio=1,
                 rope_t_extrapolation_ratio=2,
@@ -691,8 +683,6 @@ text2world_7b_example_cosmos_nemo_assets_8gpu_40gb = LazyDict(
             ),
             net=dict(
                 in_channels=16,
-                extra_per_block_abs_pos_emb=True,
-                extra_per_block_abs_pos_emb_type="learnable",
                 rope_h_extrapolation_ratio=1,
                 rope_w_extrapolation_ratio=1,
                 rope_t_extrapolation_ratio=2,
@@ -793,8 +783,6 @@ text2world_7b_example_cosmos_nemo_assets_4gpu_80gb = LazyDict(
             ),
             net=dict(
                 in_channels=16,
-                extra_per_block_abs_pos_emb=True,
-                extra_per_block_abs_pos_emb_type="learnable",
                 rope_h_extrapolation_ratio=1,
                 rope_w_extrapolation_ratio=1,
                 rope_t_extrapolation_ratio=2,
@@ -898,8 +886,6 @@ text2world_14b_example_cosmos_nemo_assets = LazyDict(
             ),
             net=dict(
                 in_channels=16,
-                extra_per_block_abs_pos_emb=True,
-                extra_per_block_abs_pos_emb_type="learnable",
                 rope_h_extrapolation_ratio=2.0,
                 rope_t_extrapolation_ratio=2.0,
                 rope_w_extrapolation_ratio=2.0,
@@ -997,8 +983,6 @@ text2world_7b_lora_example_cosmos_nemo_assets = LazyDict(
             fsdp_enabled=False,
             net=dict(
                 in_channels=16,
-                extra_per_block_abs_pos_emb=True,
-                extra_per_block_abs_pos_emb_type="learnable",
                 rope_h_extrapolation_ratio=1,
                 rope_w_extrapolation_ratio=1,
                 rope_t_extrapolation_ratio=2,

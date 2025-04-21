@@ -37,8 +37,6 @@ Cosmos_Predict1_Video2World_7B: LazyDict = LazyDict(
             ],
             conditioner=dict(video_cond_bool=dict()),
             net=L(VideoExtendGeneralDIT)(
-                extra_per_block_abs_pos_emb=True,
-                extra_per_block_abs_pos_emb_type="learnable",
                 rope_h_extrapolation_ratio=1.0,
                 rope_w_extrapolation_ratio=1.0,
                 rope_t_extrapolation_ratio=2.0,
@@ -66,8 +64,6 @@ Cosmos_Predict1_Video2World_14B: LazyDict = LazyDict(
             ],
             conditioner=dict(video_cond_bool=dict()),
             net=L(VideoExtendGeneralDIT)(
-                extra_per_block_abs_pos_emb=True,
-                extra_per_block_abs_pos_emb_type="learnable",
                 rope_h_extrapolation_ratio=2.0,
                 rope_t_extrapolation_ratio=2.0,
                 rope_w_extrapolation_ratio=2.0,

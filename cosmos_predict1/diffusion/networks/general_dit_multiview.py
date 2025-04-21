@@ -63,7 +63,7 @@ class MultiviewGeneralDIT(GeneralDIT):
         rope_w_extrapolation_ratio: float = 1.0,
         rope_t_extrapolation_ratio: float = 1.0,
         extra_per_block_abs_pos_emb: bool = True,
-        extra_per_block_abs_pos_emb_type: str = "learnable",
+        extra_per_block_abs_pos_emb_type: str = "sincos",
         extra_h_extrapolation_ratio: float = 1.0,
         extra_w_extrapolation_ratio: float = 1.0,
         extra_t_extrapolation_ratio: float = 1.0,
@@ -196,12 +196,13 @@ class MultiviewGeneralDIT(GeneralDIT):
         )
 
         if self.extra_per_block_abs_pos_emb:
+            assert self.extra_per_block_abs_pos_emb_type in [
+                "sincos",
+            ], f"Unknown extra_per_block_abs_pos_emb_type {self.extra_per_block_abs_pos_emb_type}"
             kwargs["h_extrapolation_ratio"] = self.extra_h_extrapolation_ratio
             kwargs["w_extrapolation_ratio"] = self.extra_w_extrapolation_ratio
             kwargs["t_extrapolation_ratio"] = self.extra_t_extrapolation_ratio
-            self.extra_pos_embedder = MultiviewSinCosPosEmbAxis(
-                **kwargs,
-            )
+            self.extra_pos_embedder = MultiviewSinCosPosEmbAxis(**kwargs)
 
     def forward_before_blocks(
         self,
