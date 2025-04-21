@@ -62,7 +62,7 @@ class MultiviewGeneralDIT(GeneralDIT):
         rope_h_extrapolation_ratio: float = 1.0,
         rope_w_extrapolation_ratio: float = 1.0,
         rope_t_extrapolation_ratio: float = 1.0,
-        extra_per_block_abs_pos_emb: bool = False,
+        extra_per_block_abs_pos_emb: bool = True,
         extra_per_block_abs_pos_emb_type: str = "sincos",
         extra_h_extrapolation_ratio: float = 1.0,
         extra_w_extrapolation_ratio: float = 1.0,
