@@ -179,7 +179,7 @@ class GeneralDIT(nn.Module):
         rope_w_extrapolation_ratio: float = 1.0,
         rope_t_extrapolation_ratio: float = 1.0,
         extra_per_block_abs_pos_emb: bool = True,
-        extra_per_block_abs_pos_emb_type: str = "sincos",
+        extra_per_block_abs_pos_emb_type: str = "learnable",
         extra_h_extrapolation_ratio: float = 1.0,
         extra_w_extrapolation_ratio: float = 1.0,
         extra_t_extrapolation_ratio: float = 1.0,
@@ -441,7 +441,6 @@ class GeneralDIT(nn.Module):
 
         if self.extra_per_block_abs_pos_emb:
             assert self.extra_per_block_abs_pos_emb_type in [
-                "sincos",
                 "learnable",
             ], f"Unknown extra_per_block_abs_pos_emb_type {self.extra_per_block_abs_pos_emb_type}"
             kwargs["h_extrapolation_ratio"] = self.extra_h_extrapolation_ratio
