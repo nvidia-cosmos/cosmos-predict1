@@ -20,7 +20,7 @@ import torch
 from megatron.core import ModelParallelConfig, parallel_state
 from torch import nn
 from torch.distributed import _functional_collectives as funcol
-from transformer_engine.pytorch.attention import _SplitAlongDim, apply_rotary_pos_emb, check_set_window_size
+from transformer_engine.pytorch.attention import _SplitAlongDim, apply_rotary_pos_emb
 from transformer_engine.pytorch.constants import AttnBiasTypes
 from transformer_engine.pytorch.float8_tensor import Float8Tensor
 from transformer_engine.pytorch.module.linear import Linear as LinearTE
@@ -732,3 +732,20 @@ def create_group_causal_attn_mask(
 
     assert attn_mask.shape == (total_num_query_tokens, total_num_key_tokens), "Attention mask shape mismatch"
     return attn_mask
+
+
+# Custom implementation of check_set_window_size as a fallback for transformer_engine compatibility
+def check_set_window_size(attn_mask_type, window_size):
+    """
+    A fallback implementation of check_set_window_size from transformer_engine.
+    
+    Args:
+        attn_mask_type (str): The type of attention mask.
+        window_size (Optional[Tuple[int, int]]): Window size for local attention.
+        
+    Returns:
+        Tuple[int, int] or None: The window size tuple or None.
+    """
+    if attn_mask_type is None or "causal" not in attn_mask_type:
+        return None
+    return window_size

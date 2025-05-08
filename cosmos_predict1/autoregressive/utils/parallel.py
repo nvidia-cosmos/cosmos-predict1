@@ -24,7 +24,6 @@ from torch.distributed import broadcast, get_process_group_ranks
 from transformer_engine.pytorch.jit import no_torch_dynamo
 from transformer_engine.pytorch.module.base import TransformerEngineBaseModule
 from transformer_engine.pytorch.module.rmsnorm import RMSNorm as RMSNormTE
-from transformer_engine.pytorch.module.rmsnorm import _RMSNorm
 
 from cosmos_predict1.utils import log
 
@@ -213,23 +212,17 @@ class AllReduceBWDRMSNormTE(RMSNormTE):
         # Set the activation type for AMP.
         TransformerEngineBaseModule.set_activation_dtype(self, inp)
 
-        if torch.is_grad_enabled():
-            fwd_fn = _RMSNorm.apply
-            args = []
-        else:
-            fwd_fn = _RMSNorm.forward
-            args = [None]
-
-        args += (
-            inp,
-            AllReduceBWD.apply(self.weight, self.process_group),
-            self.eps,
-            self.fwd_rmsnorm_sm_margin,
-            self.bwd_rmsnorm_sm_margin,
-            self.inf_rmsnorm_sm_margin,
-            self.zero_centered_gamma,
-            torch.is_grad_enabled(),
-            self.activation_dtype,
-        )
-
-        return fwd_fn(*args)
+        # Apply AllReduceBWD to weight to enable gradient reduction during backward pass
+        weight_with_reduce = AllReduceBWD.apply(self.weight, self.process_group)
+        
+        # Use parent class's normalized_shape and other attributes, but override the weight
+        original_weight = self.weight
+        self.weight = weight_with_reduce
+        
+        # Call parent's implementation
+        output = super().forward(inp)
+        
+        # Restore original weight reference
+        self.weight = original_weight
+        
+        return output
