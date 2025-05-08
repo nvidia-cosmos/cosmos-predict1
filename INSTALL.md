@@ -35,6 +35,23 @@ pip install transformer-engine[pytorch]==1.12.0
 
     Note: In case you encounter permission issues while mounting local files inside the docker, you can share the folders from your current directory to all users (including docker) using this helpful alias `alias share='sudo chown -R ${USER}:users $PWD && sudo chmod g+w $PWD'` before running the docker.
 
+* You can also use pytorch container from NGC (built with newest CUDA 12.9 and GPU driver 575 for GB110 sm_103)
+
+    docker login nvcr.io
+    #...
+    #Login Succeeded
+
+    docker run \
+    --gpus all \
+    --ipc=host \
+    -it \
+    -v $HOME/cosmos-predict1:/workspace/cosmos-predict1 \
+    nvcr.io/nvidia/pytorch:25.04-py3 \
+    bash
+
+    cd cosmos-predict1
+
+    pip install -r requirements_ngc.txt 
 
 You can test the environment setup for inference with
 ```bash
