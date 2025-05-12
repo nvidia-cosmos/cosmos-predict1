@@ -121,15 +121,15 @@ video2world_action_bridge_2frames = LazyDict(  # This experiment is used to veri
             eps=1e-10,
         ),
         checkpoint=dict(
-            save_iter=500,
-            broadcast_via_filesystem=False,
+            save_iter=10_000,
+            broadcast_via_filesystem=True,
             load_path="checkpoints/Cosmos-Predict1-7B-Video2World/model.pt",
             load_training_state=False,
             strict_resume=False,
             keys_not_to_resume=[],
         ),
         trainer=dict(
-            max_iter=2_000,
+            max_iter=100_000,
             distributed_parallelism="fsdp",
             logging_iter=200,
             callbacks=dict(
@@ -174,6 +174,9 @@ video2world_action_bridge_2frames = LazyDict(  # This experiment is used to veri
                 rope_h_extrapolation_ratio=1,
                 rope_w_extrapolation_ratio=1,
                 rope_t_extrapolation_ratio=2,
+                extra_per_block_abs_pos_emb=False,
+                extra_per_block_abs_pos_emb_type="sincos",
+                legacy_patch_emb=False,
             ),
             conditioner=dict(
                 video_cond_bool=dict(
