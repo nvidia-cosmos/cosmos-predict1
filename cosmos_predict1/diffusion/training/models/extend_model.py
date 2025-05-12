@@ -23,9 +23,10 @@ from einops import rearrange
 from megatron.core import parallel_state
 from torch import Tensor
 
+from cosmos_predict1.diffusion.conditioner import DataType
 from cosmos_predict1.diffusion.config.base.conditioner import VideoCondBoolConfig
 from cosmos_predict1.diffusion.functional.batch_ops import batch_mul
-from cosmos_predict1.diffusion.training.conditioner import DataType, VideoExtendCondition
+from cosmos_predict1.diffusion.training.conditioner import VideoExtendCondition
 from cosmos_predict1.diffusion.training.context_parallel import cat_outputs_cp, split_inputs_cp
 from cosmos_predict1.diffusion.training.models.model import DiffusionModel as BaseModel
 from cosmos_predict1.diffusion.training.models.model import _broadcast, broadcast_condition

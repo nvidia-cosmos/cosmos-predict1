@@ -22,7 +22,6 @@ from megatron.core import parallel_state
 from torch import Tensor
 
 from cosmos_predict1.diffusion.modules.res_sampler import COMMON_SOLVER_OPTIONS
-from cosmos_predict1.diffusion.training.conditioner import DataType
 from cosmos_predict1.diffusion.training.context_parallel import cat_outputs_cp, split_inputs_cp
 from cosmos_predict1.diffusion.training.models.model import DiffusionModel, broadcast_condition
 from cosmos_predict1.diffusion.training.models.model_image import CosmosCondition, diffusion_fsdp_class_decorator

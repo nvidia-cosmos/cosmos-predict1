@@ -13,14 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Optional, Tuple
+from typing import Optional
 
 import torch
 from einops import rearrange
-from torch import nn
-from torchvision import transforms
 
-from cosmos_predict1.diffusion.training.conditioner import DataType
+from cosmos_predict1.diffusion.conditioner import DataType
 from cosmos_predict1.diffusion.training.context_parallel import split_inputs_cp
 from cosmos_predict1.diffusion.training.networks.general_dit_multiview import MultiviewGeneralDIT
 from cosmos_predict1.utils import log

@@ -40,9 +40,18 @@ from einops import rearrange
 from megatron.core import parallel_state
 from torch import nn
 
+from cosmos_predict1.diffusion.conditioner import DataType
 from cosmos_predict1.diffusion.module.timm import Mlp
-from cosmos_predict1.diffusion.training.conditioner import DataType
 from cosmos_predict1.diffusion.training.context_parallel import split_inputs_cp
+from cosmos_predict1.diffusion.training.module.position_embedding import (
+    LearnableEmb3D,
+    LearnableEmb3D_FPS_Aware,
+    LearnablePosEmbAxis,
+    SinCosPosEmb,
+    SinCosPosEmb_FPS_Aware,
+    VideoRopePosition3DEmb,
+    VideoRopePositionEmb,
+)
 from cosmos_predict1.diffusion.training.networks.general_dit import GeneralDIT
 from cosmos_predict1.diffusion.training.tensor_parallel import scatter_along_first_dim
 from cosmos_predict1.utils import log
@@ -301,6 +310,53 @@ class ActionConditionalVideoExtendGeneralDIT(ActionConditionalGeneralDIT):
             act_layer=lambda: nn.GELU(approximate="tanh"),
             drop=0,
         )
+
+    def build_pos_embed(self):
+        if self.pos_emb_cls == "sincos":
+            cls_type = SinCosPosEmb
+        elif self.pos_emb_cls == "learnable":
+            cls_type = LearnableEmb3D
+        elif self.pos_emb_cls == "sincos_fps_aware":
+            cls_type = SinCosPosEmb_FPS_Aware
+        elif self.pos_emb_cls == "learnable_fps_aware":
+            cls_type = LearnableEmb3D_FPS_Aware
+        elif self.pos_emb_cls == "rope":
+            cls_type = VideoRopePositionEmb
+        elif self.pos_emb_cls == "rope3d":
+            cls_type = VideoRopePosition3DEmb
+        else:
+            raise ValueError(f"Unknown pos_emb_cls {self.pos_emb_cls}")
+
+        log.critical(f"Building positional embedding with {self.pos_emb_cls} class, impl {cls_type}")
+        kwargs = dict(
+            model_channels=self.model_channels,
+            len_h=self.max_img_h // self.patch_spatial,
+            len_w=self.max_img_w // self.patch_spatial,
+            len_t=self.max_frames // self.patch_temporal,
+            max_fps=self.max_fps,
+            min_fps=self.min_fps,
+            is_learnable=self.pos_emb_learnable,
+            interpolation=self.pos_emb_interpolation,
+            head_dim=self.model_channels // self.num_heads,
+            h_extrapolation_ratio=self.rope_h_extrapolation_ratio,
+            w_extrapolation_ratio=self.rope_w_extrapolation_ratio,
+            t_extrapolation_ratio=self.rope_t_extrapolation_ratio,
+        )
+        self.pos_embedder = cls_type(
+            **kwargs,
+        )
+
+        # self.extra_per_block_abs_pos_emb == False is allowed
+
+        if self.extra_per_block_abs_pos_emb:
+            assert self.extra_per_block_abs_pos_emb_type in [
+                "learnable",
+                "sincos",
+            ], f"Unknown extra_per_block_abs_pos_emb_type {self.extra_per_block_abs_pos_emb_type}"
+            kwargs["h_extrapolation_ratio"] = self.extra_h_extrapolation_ratio
+            kwargs["w_extrapolation_ratio"] = self.extra_w_extrapolation_ratio
+            kwargs["t_extrapolation_ratio"] = self.extra_t_extrapolation_ratio
+            self.extra_pos_embedder = LearnablePosEmbAxis(**kwargs)
 
     def forward(
         self,

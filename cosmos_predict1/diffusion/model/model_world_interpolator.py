@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from statistics import NormalDist
 from typing import Callable, Dict, Optional, Tuple, Union
 
@@ -23,22 +23,19 @@ from einops import rearrange
 from megatron.core import parallel_state
 from torch import Tensor
 
-from cosmos_predict1.diffusion.conditioner import VideoExtendCondition
+from cosmos_predict1.diffusion.conditioner import DataType, VideoExtendCondition
 from cosmos_predict1.diffusion.config.base.conditioner import VideoCondBoolConfig
 from cosmos_predict1.diffusion.functional.batch_ops import batch_mul
 from cosmos_predict1.diffusion.model.model_v2w import DiffusionV2WModel, broadcast_condition
 from cosmos_predict1.diffusion.module.parallel import cat_outputs_cp, split_inputs_cp
+from cosmos_predict1.diffusion.modules.denoiser_scaling import EDMScaling
 from cosmos_predict1.diffusion.modules.res_sampler import Sampler
-from cosmos_predict1.diffusion.training.conditioner import DataType
 from cosmos_predict1.diffusion.training.models.model import _broadcast
+from cosmos_predict1.diffusion.training.modules.edm_sde import EDMSDE
+from cosmos_predict1.diffusion.types import DenoisePrediction
 from cosmos_predict1.utils import log, misc
 
 IS_PREPROCESSED_KEY = "is_preprocessed"
-from dataclasses import dataclass, fields
-
-from cosmos_predict1.diffusion.modules.denoiser_scaling import EDMScaling
-from cosmos_predict1.diffusion.training.modules.edm_sde import EDMSDE
-from cosmos_predict1.diffusion.types import DenoisePrediction
 
 
 @dataclass

@@ -42,8 +42,8 @@ from torch import nn
 from torch.distributed import ProcessGroup, get_process_group_ranks
 from torchvision import transforms
 
+from cosmos_predict1.diffusion.conditioner import DataType
 from cosmos_predict1.diffusion.module.attention import get_normalization
-from cosmos_predict1.diffusion.training.conditioner import DataType
 from cosmos_predict1.diffusion.training.module.blocks import (
     DITBuildingBlock,
     FinalLayer,
@@ -58,7 +58,6 @@ from cosmos_predict1.diffusion.training.module.position_embedding import (
     LearnablePosEmbAxis,
     SinCosPosEmb,
     SinCosPosEmb_FPS_Aware,
-    SinCosPosEmbAxis,
     VideoRopePosition3DEmb,
     VideoRopePositionEmb,
 )

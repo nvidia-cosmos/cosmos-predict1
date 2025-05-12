@@ -20,7 +20,7 @@ from einops import rearrange
 from megatron.core import parallel_state
 from torch import nn
 
-from cosmos_predict1.diffusion.training.conditioner import DataType
+from cosmos_predict1.diffusion.conditioner import DataType
 from cosmos_predict1.diffusion.training.context_parallel import split_inputs_cp
 from cosmos_predict1.diffusion.training.module.blocks import SDXLTimestepEmbedding, SDXLTimesteps
 from cosmos_predict1.diffusion.training.networks.general_dit import GeneralDIT

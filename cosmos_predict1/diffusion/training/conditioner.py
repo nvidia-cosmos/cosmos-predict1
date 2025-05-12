@@ -14,22 +14,15 @@
 # limitations under the License.
 
 from dataclasses import dataclass, fields
-from enum import Enum
 from typing import Any, Dict, Optional, Tuple, Union
 
 import torch
 import torch.nn as nn
 
-from cosmos_predict1.diffusion.conditioner import GeneralConditioner
+from cosmos_predict1.diffusion.conditioner import DataType, GeneralConditioner
 from cosmos_predict1.diffusion.functional.batch_ops import batch_mul
 from cosmos_predict1.diffusion.training.context_parallel import split_inputs_cp
 from cosmos_predict1.utils.misc import count_params
-
-
-class DataType(Enum):
-    IMAGE = "image"
-    VIDEO = "video"
-    MIX = "mix"
 
 
 class AbstractEmbModel(nn.Module):
