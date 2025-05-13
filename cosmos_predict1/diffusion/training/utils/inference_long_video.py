@@ -48,16 +48,16 @@ def switch_config_for_inference(model):
     current_apply_corruption_to_condition_region = (
         model.config.conditioner.video_cond_bool.apply_corruption_to_condition_region
     )
+    log.info("Change the condition_location to 'first_n' for inference")
     try:
-        log.info(
-            "Change the condition_location to 'first_n' for inference, and apply_corruption_to_condition_region to False"
-        )
         # Change the condition_location to "first_n" for inference
         model.config.conditioner.video_cond_bool.condition_location = current_condition_location
         if current_apply_corruption_to_condition_region == "gaussian_blur":
             model.config.conditioner.video_cond_bool.apply_corruption_to_condition_region = "clean"
+            log.info("Change apply_corruption_to_condition_region to clean")
         elif current_apply_corruption_to_condition_region == "noise_with_sigma":
             model.config.conditioner.video_cond_bool.apply_corruption_to_condition_region = "noise_with_sigma_fixed"
+            log.info("Change apply_corruption_to_condition_region to noise_with_sigma_fixed")
         # Yield control back to the calling context
         yield
     finally:
@@ -342,7 +342,7 @@ def generate_video_from_batch_with_loop(
     save_fig_path: str = None,
     skip_reencode: int = 0,
     return_noise: bool = False,
-) -> Tuple[np.array, list, list, torch.Tensor] | Tuple[np.array, list, list, torch.Tensor, torch.Tensor]:
+) -> Tuple[np.array, list, list, torch.Tensor] | Tuple[np.array, list, list]:
     """Generate video with loop, given data batch. The condition latent will be updated at each loop.
     Args:
         model (ExtendDiffusionModel)

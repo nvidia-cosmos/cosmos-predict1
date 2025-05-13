@@ -131,6 +131,8 @@ class VideoExtendCondition(BaseVideoCondition):
     condition_video_input_mask: Optional[torch.Tensor] = None
     # condition_video_augment_sigma: (B, T) tensor of sigma value for the conditional input augmentation, only valid when apply_corruption_to_condition_region is "noise_with_sigma" or "noise_with_sigma_fixed"
     condition_video_augment_sigma: Optional[torch.Tensor] = None
+    # pose conditional input, will be concat with the input tensor
+    condition_video_pose: Optional[torch.Tensor] = None
 
 
 class GeneralConditioner(nn.Module, ABC):
