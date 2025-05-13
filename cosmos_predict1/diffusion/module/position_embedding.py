@@ -13,10 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Optional
+from typing import Literal, Optional
 
 import numpy as np
 import torch
+import torch.nn.functional as F
 from einops import rearrange, repeat
 from torch import nn
 from torch.distributed import ProcessGroup, get_process_group_ranks
@@ -45,6 +46,41 @@ def get_1d_sincos_pos_embed_from_grid(embed_dim, pos):
 
     emb = np.concatenate([emb_sin, emb_cos], axis=1)  # (M, D)
     return emb
+
+
+def get_3d_sincos_pos_embed(
+    embed_dim,
+    grid_size_h,
+    grid_size_w,
+    grid_size_t,
+    spatial_interpolation_scale,
+    temporal_interpolation_scale,
+    concat=True,
+):
+    grid_h = np.arange(grid_size_h, dtype=np.float32) / spatial_interpolation_scale
+    grid_w = np.arange(grid_size_w, dtype=np.float32) / spatial_interpolation_scale
+    grid_t = np.arange(grid_size_t, dtype=np.float32) / temporal_interpolation_scale
+
+    grid = np.meshgrid(grid_w, grid_h, grid_t, indexing="ij")
+    grid = np.stack(grid, axis=0)
+    grid = grid.reshape(3, 1, grid_size_h, grid_size_w, grid_size_t)
+
+    if concat:
+        per_axis = embed_dim // 3
+        per_axis = (per_axis // 2) * 2  # make it even (for sin/cos split)
+        dim_h, dim_w = per_axis, per_axis
+        dim_t = embed_dim - dim_h - dim_w
+        emb_h = get_1d_sincos_pos_embed_from_grid(dim_h, grid[0])  # (H*W, D/3)
+        emb_w = get_1d_sincos_pos_embed_from_grid(dim_w, grid[1])  # (H*W, D/3)
+        emb_t = get_1d_sincos_pos_embed_from_grid(dim_t, grid[2])  # (H*W, D/3)
+
+        return np.concatenate([emb_h, emb_w, emb_t], axis=1)  # (H*W*T, D)
+    else:
+        emb_h = get_1d_sincos_pos_embed_from_grid(embed_dim, grid[0])  # (H*W)
+        emb_w = get_1d_sincos_pos_embed_from_grid(embed_dim, grid[1])  # (H*W)
+        emb_t = get_1d_sincos_pos_embed_from_grid(embed_dim, grid[2])  # (H*W)
+
+        return emb_h + emb_w + emb_t  # (H*W*T, D)
 
 
 class VideoPositionEmb(nn.Module):
@@ -80,6 +116,120 @@ class VideoPositionEmb(nn.Module):
 
     def generate_embeddings(self, B_T_H_W_C: torch.Size, fps=Optional[torch.Tensor]):
         raise NotImplementedError
+
+
+class SinCosPosEmb(VideoPositionEmb):
+    def __init__(
+        self,
+        *,  # enforce keyword arguments
+        model_channels: int,
+        len_h: int,
+        len_w: int,
+        len_t: int,
+        is_learnable: bool = False,
+        interpolation: Literal["crop", "resize", "crop_resize"] = "crop",
+        spatial_interpolation_scale=1.0,
+        temporal_interpolation_scale=1.0,
+        init_length_for_resize: int = 16,
+        **kwargs,
+    ):
+        """
+        Args:
+            interpolation (str): "crop", "resize", "crop_resize". "crop" means we crop the positional embedding to the length of the input sequence. "resize" means we resize the positional embedding to the length of the input sequence. "crop_resize" (inference only) means we first crop the positional embedding to init_length_for_resize, then resize it to the length of the input sequence.
+            init_length_for_resize (int): used when interpolation is "crop_resize", where we "resize" embedding during inference for model trained with "crop". We first "crop" the pos_embed to this length (used during training), then run the "resize", default 16
+        """
+        del kwargs  # unused
+        super().__init__()
+        self.interpolation = interpolation
+        self.init_length_for_resize = init_length_for_resize
+        param = get_3d_sincos_pos_embed(
+            model_channels, len_h, len_w, len_t, spatial_interpolation_scale, temporal_interpolation_scale
+        )
+        param = rearrange(param, "(h w t) c -> 1 t h w c", h=len_h, w=len_w)
+        if is_learnable:
+            self.pos_embed = nn.Parameter(
+                torch.from_numpy(param).float(),
+            )
+        else:
+            self.register_buffer("pos_embed", torch.from_numpy(param).float(), persistent=False)
+
+    def generate_embeddings(self, B_T_H_W_C: torch.Size, fps=Optional[torch.Tensor]) -> torch.Tensor:
+        B, T, H, W, C = B_T_H_W_C
+        if self.interpolation == "crop":
+            return self.pos_embed[:, :T, :H, :W]
+        if self.interpolation == "resize":
+            return rearrange(
+                F.interpolate(
+                    rearrange(self.pos_embed, "1 t h w c -> 1 c h w t"),
+                    size=(H, W, T),
+                    mode="linear",
+                    align_corners=False,
+                ),
+                "1 c h w t -> 1 t h w c",
+            )
+        if self.interpolation == "crop_resize":
+            pos_embed_crop = self.pos_embed[:, : self.init_length_for_resize, :H, :W]  # B,T,H,W,C
+            _, t, h, w, c = pos_embed_crop.shape
+
+            pos_embed_crop_resize_t = rearrange(
+                F.interpolate(
+                    rearrange(pos_embed_crop, "1 t h w c -> 1 (c h w) t"),
+                    size=(T),
+                    mode="linear",
+                ),
+                "1 (c h w) t -> 1 t h w c",
+                c=c,
+                h=h,
+                w=w,
+            )
+            pos_embed_crop_resize = rearrange(
+                F.interpolate(
+                    rearrange(pos_embed_crop_resize_t, "1 t h w c -> 1 (c t) h w"),
+                    size=(H, W),
+                    mode="bilinear",
+                ),
+                "1 (c t) h w -> 1 t h w c",
+                c=c,
+            )
+            return pos_embed_crop_resize
+
+        raise ValueError(f"Unknown interpolation method {self.interpolation}")
+
+
+class LearnableEmb3D(VideoPositionEmb):
+    def __init__(
+        self,
+        *,  # enforce keyword arguments
+        model_channels: int,
+        len_h: int,
+        len_w: int,
+        len_t: int,
+        interpolation: str = "crop",
+        is_learnable: bool = True,
+        **kwargs,  # used for compatibility with other positional embeddings; unused in this class
+    ):
+        del kwargs  # unused
+        super().__init__()
+        assert is_learnable is True
+        self.interpolation = interpolation
+        self.pos_embed = nn.Parameter(torch.zeros(1, len_t, len_h, len_w, model_channels))
+        trunc_normal_(self.pos_embed, std=0.02)
+
+    def generate_embeddings(self, B_T_H_W_C: torch.Size, fps=Optional[torch.Tensor]) -> torch.Tensor:
+        B, T, H, W, C = B_T_H_W_C
+        if self.interpolation == "crop":
+            return self.pos_embed[:, :T, :H, :W]
+        if self.interpolation == "resize":
+            return rearrange(
+                F.interpolate(
+                    rearrange(self.pos_embed, "1 t h w c -> 1 c h w t"),
+                    size=(H, W, T),
+                    mode="linear",
+                    align_corners=False,
+                ),
+                "1 c h w t -> 1 t h w c",
+            )
+        raise ValueError(f"Unknown interpolation method {self.interpolation}")
 
 
 class VideoRopePosition3DEmb(VideoPositionEmb):

@@ -26,7 +26,6 @@ from cosmos_predict1.diffusion.module.pretrained_vae import BaseVAE
 from cosmos_predict1.diffusion.training.utils.layer_control.peft_control_config_parser import LayerControlConfigParser
 from cosmos_predict1.diffusion.training.utils.peft.peft import add_lora_layers, setup_lora_requires_grad
 from cosmos_predict1.utils import log, misc
-from cosmos_predict1.utils.distributed import get_rank
 from cosmos_predict1.utils.lazy_config import instantiate as lazy_instantiate
 
 

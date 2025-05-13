@@ -301,7 +301,7 @@ def skip_init_linear():
 
 def load_model_by_config(
     config_job_name,
-    config_file="projects/cosmos_video/config/config.py",
+    config_file="cosmos_predict1/diffusion/config/config.py",
     model_class=DiffusionT2WModel,
 ):
     config_module = get_config_module(config_file)
