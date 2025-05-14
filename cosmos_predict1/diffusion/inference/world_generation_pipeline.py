@@ -773,53 +773,7 @@ class DiffusionVideo2WorldActionGenerationPipeline(DiffusionVideo2WorldGeneratio
             model_class=DiffusionActionV2WModel,
         )
 
-    def _run_model(
-        self,
-        embedding: torch.Tensor,
-        condition_latent: torch.Tensor,
-        negative_prompt_embedding: torch.Tensor | None = None,
-    ) -> torch.Tensor:
-        """Generate video frames using the diffusion model.
-
-        Args:
-            embedding: Text embedding tensor from T5 encoder
-            condition_latent: Latent tensor from conditioning image or video
-            negative_prompt_embedding: Optional embedding for negative prompt guidance
-
-        Returns:
-            Tensor of generated video frames
-
-        Note:
-            Model and tokenizer are automatically offloaded after inference
-            if offloading is enabled.
-        """
-        # Get video batch and state shape
-        data_batch, state_shape = get_video_batch(
-            model=self.model,
-            prompt_embedding=embedding,
-            negative_prompt_embedding=negative_prompt_embedding,
-            height=self.height,
-            width=self.width,
-            fps=self.fps,
-            num_video_frames=self.num_video_frames,
-        )
-
-        # Generate video frames
-        video = generate_world_from_video(
-            model=self.model,
-            state_shape=self.model.state_shape,
-            is_negative_prompt=True,
-            data_batch=data_batch,
-            guidance=self.guidance,
-            num_steps=self.num_steps,
-            seed=self.seed,
-            condition_latent=condition_latent,
-            num_input_frames=self.num_input_frames,
-        )
-
-        return video
-
-    def _run_tokenizer_encoding(self, image_or_video_path: str) -> torch.Tensor:
+    def _run_tokenizer_encoding(self, raw_video_batch: dict, num_of_latent_condition: int) -> torch.Tensor:
         """
         Encode image to latent space
 
@@ -829,53 +783,10 @@ class DiffusionVideo2WorldActionGenerationPipeline(DiffusionVideo2WorldGeneratio
         Returns:
             torch.Tensor: Latent tensor from tokenizer encoding
         """
-        condition_latent = get_condition_latent(
-            model=self.model,
-            input_image_or_video_path=image_or_video_path,
-            num_input_frames=self.num_input_frames,
-            state_shape=self.model.state_shape,
-        )
+
+        condition_latent = get_condition_latent_action(self.model, raw_video_batch, num_of_latent_condition)
 
         return condition_latent
-
-    def _run_model_with_offload(
-        self,
-        prompt_embedding: torch.Tensor,
-        image_or_video_path: str,
-        negative_prompt_embedding: Optional[torch.Tensor] = None,
-    ) -> np.ndarray:
-        """Generate world representation with automatic model offloading.
-
-        Wraps the core generation process with model loading/offloading logic
-        to minimize GPU memory usage during inference.
-
-        Args:
-            prompt_embedding: Text embedding tensor from T5 encoder
-            image_or_video_path: Path to conditioning image or video
-            negative_prompt_embedding: Optional embedding for negative prompt guidance
-
-        Returns:
-            np.ndarray: Generated world representation as numpy array
-        """
-        if self.offload_tokenizer:
-            self._load_tokenizer()
-
-        condition_latent = self._run_tokenizer_encoding(image_or_video_path)
-
-        if self.offload_network:
-            self._load_network()
-
-        sample = self._run_model(prompt_embedding, condition_latent, negative_prompt_embedding)
-
-        if self.offload_network:
-            self._offload_network()
-
-        sample = self._run_tokenizer_decoding(sample)
-
-        if self.offload_tokenizer:
-            self._offload_tokenizer()
-
-        return sample
 
     def get_traj(self, video_path: str, annotation_path: str) -> Tuple[np.ndarray, np.ndarray]:
         not_norm_preprocess = Compose([ToTensorVideo(), Resize_Preprocess(tuple([256, 320]))])
@@ -953,7 +864,7 @@ class DiffusionVideo2WorldActionGenerationPipeline(DiffusionVideo2WorldGeneratio
                 raw_video_batch["action"] = action_t_tensor
                 raw_video_batch["is_preprocessed"] = False
 
-                condition_latent = get_condition_latent_action(self.model, raw_video_batch, num_of_latent_condition)  # type: ignore
+                condition_latent = self._run_tokenizer_encoding(raw_video_batch, num_of_latent_condition)
 
                 # Pad condition latent to have shape [1, 16, num_latents, 32, 40]
                 B, C, _, H, W = condition_latent.shape
@@ -980,15 +891,6 @@ class DiffusionVideo2WorldActionGenerationPipeline(DiffusionVideo2WorldGeneratio
             pred_frames.append(curr_frame)
 
         video = np.stack(pred_frames, axis=0)
-        log.info(f"video.shape: {video.shape}")
-        log.info(f"video.dtype: {video.dtype}")
-
-        ###########################################
-        # video = self._run_model_with_offload(
-        #     prompt_embedding,
-        #     negative_prompt_embedding=negative_prompt_embedding,
-        #     image_or_video_path=image_or_video_path,
-        # )
         log.info("Finish generation")
 
         if not self.disable_guardrail:

@@ -169,5 +169,9 @@ cp checkpoints/posttraining/diffusion_video2world_action/video2world_action_brid
 CUDA_HOME=$CONDA_PREFIX PYTHONPATH=$(pwd) python cosmos_predict1/diffusion/inference/video2world_action.py \
     --checkpoint_dir checkpoints \
     --diffusion_transformer_dir Cosmos-Predict1-7B-Video2World_action_post-trained \
-    --video_save_name diffusion-video2world-7b-action-post-trained
+    --seed 0 \
+    --input_image_or_video_path "datasets/bridge/videos/test/346/rgb.mp4" --action_annotation_path datasets/bridge/annotation/test/346.json \
+    --height 256 \
+    --width 320 \
+    --fps 3
 ```
