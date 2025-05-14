@@ -14,18 +14,22 @@
 # limitations under the License.
 
 import gc
+import json
 import os
-from typing import Any, Optional
+from typing import Any, Optional, Tuple
 
 import einops
+import imageio
 import numpy as np
 import torch
 from megatron.core import parallel_state
+from torchvision.transforms import Compose
 
 from cosmos_predict1.diffusion.inference.inference_utils import (
     generate_world_from_text,
     generate_world_from_video,
     get_condition_latent,
+    get_condition_latent_action,
     get_condition_latent_multiview,
     get_video_batch,
     get_video_batch_for_multiview_model,
@@ -37,6 +41,7 @@ from cosmos_predict1.diffusion.inference.inference_utils import (
 from cosmos_predict1.diffusion.model.model_t2w import DiffusionT2WModel
 from cosmos_predict1.diffusion.model.model_t2w_multiview import DiffusionMultiviewT2WModel
 from cosmos_predict1.diffusion.model.model_v2w import DiffusionV2WModel
+from cosmos_predict1.diffusion.model.model_v2w_action import DiffusionActionV2WModel
 from cosmos_predict1.diffusion.model.model_v2w_multiview import DiffusionMultiviewV2WModel
 from cosmos_predict1.diffusion.model.model_world_interpolator import DiffusionWorldInterpolatorWModel
 from cosmos_predict1.diffusion.prompt_upsampler.text2world_prompt_upsampler_inference import (
@@ -50,7 +55,11 @@ from cosmos_predict1.diffusion.prompt_upsampler.video2world_prompt_upsampler_inf
 from cosmos_predict1.diffusion.prompt_upsampler.video2world_prompt_upsampler_inference import (
     run_chat_completion as run_chat_completion_vlm,
 )
-from cosmos_predict1.diffusion.training.utils.inference_long_video import generate_video_from_batch_with_loop
+from cosmos_predict1.diffusion.training.utils.inference_long_video import (
+    generate_video_from_batch_with_loop,
+    switch_config_for_inference,
+)
+from cosmos_predict1.diffusion.utils.dataset_utils import Resize_Preprocess, ToTensorVideo
 from cosmos_predict1.utils import distributed, log
 from cosmos_predict1.utils.base_world_generation_pipeline import BaseWorldGenerationPipeline
 
@@ -82,6 +91,8 @@ MODEL_NAME_DICT = {
     "Cosmos-Predict1-7B-WorldInterpolator": "Cosmos_Predict1_WorldInterpolator_7B",
     # video2world action-conditioned
     "Cosmos-Predict1-7B-Video2World_action_post-trained": "Cosmos_Predict1_Video2World_7B_Action_Post_trained",
+    # video2world instruction-conditioned
+    "Cosmos-Predict1-7B-Video2World_instruction_post-trained": "Cosmos_Predict1_Video2World_7B_instruction_Post_trained",
 }
 
 
@@ -134,6 +145,7 @@ class DiffusionText2WorldGenerationPipeline(BaseWorldGenerationPipeline):
         assert inference_type in [
             "text2world",
             "video2world",
+            "video2world_action",
             "world_interpolator",
         ], "Invalid inference_type, must be 'text2world' or 'video2world'"
 
@@ -687,6 +699,307 @@ class DiffusionVideo2WorldGenerationPipeline(DiffusionText2WorldGenerationPipeli
             log.info("Pass guardrail on generated video")
 
         return video, prompt
+
+
+class DiffusionVideo2WorldActionGenerationPipeline(DiffusionVideo2WorldGenerationPipeline):
+    def __init__(
+        self,
+        inference_type: str,
+        checkpoint_dir: str,
+        checkpoint_name: str,
+        offload_network: bool = False,
+        offload_tokenizer: bool = False,
+        offload_text_encoder_model: bool = False,
+        offload_guardrail_models: bool = False,
+        disable_guardrail: bool = False,
+        guidance: float = 7.0,
+        num_steps: int = 35,
+        height: int = 704,
+        width: int = 1280,
+        fps: int = 24,
+        num_video_frames: int = 121,
+        seed: int = 0,
+        num_input_frames: int = 1,
+    ):
+        """Initialize diffusion world generation pipeline.
+
+        Args:
+            inference_type: Type of world generation ('text2world' or 'video2world', 'video2world_action')
+            checkpoint_dir: Base directory containing model checkpoints
+            checkpoint_name: Name of the diffusion transformer checkpoint to use
+            has_text_input: Whether the pipeline takes text input for world generation
+            offload_network: Whether to offload diffusion transformer after inference
+            offload_tokenizer: Whether to offload tokenizer after inference
+            offload_text_encoder_model: Whether to offload T5 model after inference
+            offload_prompt_upsampler: Whether to offload prompt upsampler
+            offload_guardrail_models: Whether to offload guardrail models
+            disable_guardrail: Whether to disable guardrail
+            guidance: Classifier-free guidance scale
+            num_steps: Number of diffusion sampling steps
+            height: Height of output video
+            width: Width of output video
+            fps: Frames per second of output video
+            num_video_frames: Number of frames to generate
+            seed: Random seed for sampling
+            num_input_frames: Number of latent conditions
+        """
+        self.num_input_frames = num_input_frames
+        super().__init__(
+            inference_type=inference_type,
+            checkpoint_dir=checkpoint_dir,
+            checkpoint_name=checkpoint_name,
+            prompt_upsampler_dir=None,
+            enable_prompt_upsampler=False,
+            has_text_input=False,
+            offload_network=offload_network,
+            offload_tokenizer=offload_tokenizer,
+            offload_text_encoder_model=offload_text_encoder_model,
+            offload_prompt_upsampler=True,
+            offload_guardrail_models=offload_guardrail_models,
+            disable_guardrail=disable_guardrail,
+            guidance=guidance,
+            num_steps=num_steps,
+            height=height,
+            width=width,
+            fps=fps,
+            num_video_frames=num_video_frames,
+            seed=seed,
+        )
+
+    def _load_model(self):
+        self.model = load_model_by_config(
+            config_job_name=self.model_name,
+            config_file="cosmos_predict1/diffusion/config/config.py",
+            model_class=DiffusionActionV2WModel,
+        )
+
+    def _run_model(
+        self,
+        embedding: torch.Tensor,
+        condition_latent: torch.Tensor,
+        negative_prompt_embedding: torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        """Generate video frames using the diffusion model.
+
+        Args:
+            embedding: Text embedding tensor from T5 encoder
+            condition_latent: Latent tensor from conditioning image or video
+            negative_prompt_embedding: Optional embedding for negative prompt guidance
+
+        Returns:
+            Tensor of generated video frames
+
+        Note:
+            Model and tokenizer are automatically offloaded after inference
+            if offloading is enabled.
+        """
+        # Get video batch and state shape
+        data_batch, state_shape = get_video_batch(
+            model=self.model,
+            prompt_embedding=embedding,
+            negative_prompt_embedding=negative_prompt_embedding,
+            height=self.height,
+            width=self.width,
+            fps=self.fps,
+            num_video_frames=self.num_video_frames,
+        )
+
+        # Generate video frames
+        video = generate_world_from_video(
+            model=self.model,
+            state_shape=self.model.state_shape,
+            is_negative_prompt=True,
+            data_batch=data_batch,
+            guidance=self.guidance,
+            num_steps=self.num_steps,
+            seed=self.seed,
+            condition_latent=condition_latent,
+            num_input_frames=self.num_input_frames,
+        )
+
+        return video
+
+    def _run_tokenizer_encoding(self, image_or_video_path: str) -> torch.Tensor:
+        """
+        Encode image to latent space
+
+        Args:
+            image_or_video_path: Path to conditioning image
+
+        Returns:
+            torch.Tensor: Latent tensor from tokenizer encoding
+        """
+        condition_latent = get_condition_latent(
+            model=self.model,
+            input_image_or_video_path=image_or_video_path,
+            num_input_frames=self.num_input_frames,
+            state_shape=self.model.state_shape,
+        )
+
+        return condition_latent
+
+    def _run_model_with_offload(
+        self,
+        prompt_embedding: torch.Tensor,
+        image_or_video_path: str,
+        negative_prompt_embedding: Optional[torch.Tensor] = None,
+    ) -> np.ndarray:
+        """Generate world representation with automatic model offloading.
+
+        Wraps the core generation process with model loading/offloading logic
+        to minimize GPU memory usage during inference.
+
+        Args:
+            prompt_embedding: Text embedding tensor from T5 encoder
+            image_or_video_path: Path to conditioning image or video
+            negative_prompt_embedding: Optional embedding for negative prompt guidance
+
+        Returns:
+            np.ndarray: Generated world representation as numpy array
+        """
+        if self.offload_tokenizer:
+            self._load_tokenizer()
+
+        condition_latent = self._run_tokenizer_encoding(image_or_video_path)
+
+        if self.offload_network:
+            self._load_network()
+
+        sample = self._run_model(prompt_embedding, condition_latent, negative_prompt_embedding)
+
+        if self.offload_network:
+            self._offload_network()
+
+        sample = self._run_tokenizer_decoding(sample)
+
+        if self.offload_tokenizer:
+            self._offload_tokenizer()
+
+        return sample
+
+    def get_traj(self, video_path: str, annotation_path: str) -> Tuple[np.ndarray, np.ndarray]:
+        not_norm_preprocess = Compose([ToTensorVideo(), Resize_Preprocess(tuple([256, 320]))])
+
+        with open(annotation_path, "r") as file:
+            data = json.load(file)
+
+        frames = imageio.v3.imread(video_path)
+        frames = not_norm_preprocess(torch.from_numpy(frames).permute(0, 3, 1, 2))
+        frames = torch.clamp(frames * 255.0, 0, 255).to(torch.uint8).permute(0, 2, 3, 1).numpy()
+
+        action_ee = np.array(data["action"])[:, :6] * 20
+        gripper = np.array(data["action"])[:, 6][:, None]
+        action = np.concatenate([action_ee, gripper], axis=1)
+
+        return frames, action
+
+    def generate(
+        self,
+        action_path: str,
+        image_or_video_path: str,
+        num_of_latent_condition: int = 1,
+        num_of_loops: int = 1,
+        num_input_frames: int = 2,
+    ) -> tuple[np.ndarray, str] | None:
+        """Generate video from text prompt and optional image.
+
+        Pipeline steps:
+        1. Convert action to embeddings
+        2. Generate video frames using diffusion
+        3. Run safety checks and apply face blur on generated video frames
+
+        Args:
+            action_path: Text description of desired video
+            image_or_video_path: Path to conditioning image or video
+            num_of_latent_condition: Number of latent condition to condition on
+            num_of_loops: Number of loops to generate video
+
+        Returns:
+            Generated video frames as uint8 np.ndarray [T, H, W, C],
+            or None if content fails guardrail safety checks
+        """
+
+        log.info(f"Run with image or video path: {image_or_video_path}")
+        log.info(f"Run with action path: {action_path}")
+
+        # get frames & actions
+        frames, actions = self.get_traj(image_or_video_path, action_path)
+        pred_frames, curr_frame = [frames[0]], frames[0]
+
+        # video batch template
+        raw_video_batch = dict()
+        raw_video_batch["video"] = None
+        raw_video_batch["chunk_index"] = torch.zeros(1, device="cuda", dtype=torch.int64)
+        raw_video_batch["padding_mask"] = torch.zeros(1, 1, 704, 1280, device="cuda", dtype=torch.bfloat16)
+        raw_video_batch["t5_text_embeddings"] = torch.zeros(1, 512, 1024, dtype=torch.bfloat16).cuda()
+        raw_video_batch["t5_text_mask"] = torch.ones(1, 512, device="cuda", dtype=torch.int64)
+        raw_video_batch["fps"] = torch.tensor([4.0]).cuda()
+        raw_video_batch["image_size"] = torch.tensor([[256, 256, 256, 256]]).cuda()
+        raw_video_batch["num_frames"] = torch.tensor([num_input_frames]).cuda()
+        raw_video_batch["dataset_name"] = "video_data"
+
+        # Generate video
+        log.info("Run generation")
+        for action_t in actions:
+            with switch_config_for_inference(self.model):
+                action_t_tensor = torch.tensor(action_t)[None, None, ...].bfloat16().cuda()
+
+                zero_pad = torch.zeros(curr_frame.shape).byte().cuda()
+                curr_frame_tensor = torch.tensor(curr_frame).cuda()
+                chunk_tensor = torch.stack([curr_frame_tensor, zero_pad], dim=0)[None, ...]
+                chunk_tensor = einops.rearrange(chunk_tensor, "b t h w c -> b c t h w")
+
+                raw_video_batch["video"] = chunk_tensor
+                raw_video_batch["action"] = action_t_tensor
+                raw_video_batch["is_preprocessed"] = False
+
+                condition_latent = get_condition_latent_action(self.model, raw_video_batch, num_of_latent_condition)  # type: ignore
+
+                # Pad condition latent to have shape [1, 16, num_latents, 32, 40]
+                B, C, _, H, W = condition_latent.shape
+                paddings = torch.zeros(B, C, 0, H, W, dtype=torch.bfloat16).cuda()
+                condition_latent = torch.cat([condition_latent, paddings], dim=2)
+
+                video_np_THWC_v1, _, _ = generate_video_from_batch_with_loop(
+                    model=self.model,
+                    data_batch=raw_video_batch,
+                    condition_latent=condition_latent,
+                    num_of_loops=num_of_loops,
+                    num_of_latent_overlap_list=[num_of_latent_condition] * num_of_loops,
+                    guidance=self.guidance,
+                    state_shape=self.model.state_shape,
+                    num_steps=self.num_steps,
+                    seed=self.seed,
+                    is_negative_prompt=False,
+                    visualize=False,
+                    save_fig_path=None,
+                    return_noise=False,
+                )
+
+            curr_frame = video_np_THWC_v1[1]
+            pred_frames.append(curr_frame)
+
+        video = np.stack(pred_frames, axis=0)
+        log.info(f"video.shape: {video.shape}")
+        log.info(f"video.dtype: {video.dtype}")
+
+        ###########################################
+        # video = self._run_model_with_offload(
+        #     prompt_embedding,
+        #     negative_prompt_embedding=negative_prompt_embedding,
+        #     image_or_video_path=image_or_video_path,
+        # )
+        log.info("Finish generation")
+
+        if not self.disable_guardrail:
+            log.info("Run guardrail on generated video")
+            video = self._run_guardrail_on_video_with_offload(video)
+            if video is None:
+                log.critical("Generated video is not safe")
+                return None
+            log.info("Pass guardrail on generated video")
+
+        return video
 
 
 class DiffusionText2WorldMultiviewGenerationPipeline(DiffusionText2WorldGenerationPipeline):

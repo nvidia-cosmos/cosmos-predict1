@@ -19,7 +19,6 @@ from cosmos_predict1.diffusion.training.networks.general_dit_lvg import VideoExt
 from cosmos_predict1.utils.lazy_config import LazyCall as L
 from cosmos_predict1.utils.lazy_config import LazyDict
 
-
 Cosmos_Predict1_Video2World_7B_Action_Post_trained: LazyDict = LazyDict(
     dict(
         defaults=[
