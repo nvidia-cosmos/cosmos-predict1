@@ -104,7 +104,6 @@ def demo(args: argparse.Namespace) -> None:
     if args.num_gpus > 1:
         distributed.init()
         parallel_state.initialize_model_parallel(context_parallel_size=args.num_gpus)
-        process_group = parallel_state.get_context_parallel_group()
 
     # Initialize action-conditioned video2world generation model pipeline
     pipeline = DiffusionVideo2WorldActionGenerationPipeline(
@@ -125,10 +124,6 @@ def demo(args: argparse.Namespace) -> None:
         seed=args.seed,
         num_input_frames=args.num_input_frames,
     )
-
-    if args.num_gpus > 1:
-        distributed.init()
-        parallel_state.initialize_model_parallel(context_parallel_size=args.num_gpus)
 
     generated_output = pipeline.generate(
         action_path=args.action_annotation_path,
