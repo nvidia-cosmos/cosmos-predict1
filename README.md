@@ -47,6 +47,7 @@ Please refer to [INSTALL.md](INSTALL.md) for general instructions on environment
 ### Post-train pre-trained Cosmos-Predict1 models
 * [Post-train diffusion-based Text2World models using custom datasets](/examples/post-training_diffusion_text2world.md) **[with multi-node support]**
 * [Post-train diffusion-based Video2World models using custom datasets](/examples/post-training_diffusion_video2world.md) **[with multi-node support]**
+* [Post-train diffusion-based Video2World models with action control using custom datasets](/examples/post-training_diffusion_video2world_action.md) **[with multi-node support]**
 * [Post-train diffusion-based WorldInterpolator models using custom datasets](/examples/post-training_diffusion_interpolator.md) **[with multi-node support]**
 * [Post-train diffusion-based Text2World models using custom multi-view datasets](/examples/post-training_diffusion_text2world_multiview.md) **[with multi-node support]**
 * [Post-train diffusion-based Video2World models using custom multi-view datasets)](/examples/post-training_diffusion_video2world_multiview.md) **[with multi-node support]**
