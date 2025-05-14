@@ -182,13 +182,14 @@ def validate_args(args: argparse.Namespace, inference_type: str) -> None:
     assert inference_type in [
         "text2world",
         "video2world",
+        "video2world_action",
         "world_interpolator",
     ], "Invalid inference_type, must be 'text2world' or 'video2world'"
 
     # Validate prompt/image/video args for single or batch generation
     if inference_type == "text2world" or (inference_type == "video2world" and args.disable_prompt_upsampler):
         assert args.prompt or args.batch_input_path, "--prompt or --batch_input_path must be provided."
-    if inference_type in ("video2world", "world_interpolator") and not args.batch_input_path:
+    if inference_type in ("video2world", "video2world_action", "world_interpolator") and not args.batch_input_path:
         assert (
             args.input_image_or_video_path
         ), "--input_image_or_video_path must be provided for single video generation."

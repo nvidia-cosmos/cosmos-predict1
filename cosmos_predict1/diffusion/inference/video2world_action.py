@@ -97,7 +97,7 @@ def demo(args: argparse.Namespace) -> None:
         - Generated MP4 video files
     """
     misc.set_random_seed(args.seed)
-    inference_type = "video2world"
+    inference_type = "video2world_action"
     validate_args(args, inference_type)
 
     if args.num_gpus > 1:
