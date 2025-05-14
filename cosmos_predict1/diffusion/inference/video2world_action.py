@@ -17,10 +17,11 @@ import argparse
 import os
 
 import torch
+from megatron.core import parallel_state
 
 from cosmos_predict1.diffusion.inference.inference_utils import add_common_arguments, remove_argument, validate_args
 from cosmos_predict1.diffusion.inference.world_generation_pipeline import DiffusionVideo2WorldActionGenerationPipeline
-from cosmos_predict1.utils import log, misc
+from cosmos_predict1.utils import distributed, log, misc
 from cosmos_predict1.utils.io import save_video
 
 torch.enable_grad(False)
@@ -101,10 +102,6 @@ def demo(args: argparse.Namespace) -> None:
     validate_args(args, inference_type)
 
     if args.num_gpus > 1:
-        from megatron.core import parallel_state
-
-        from cosmos_predict1.utils import distributed
-
         distributed.init()
         parallel_state.initialize_model_parallel(context_parallel_size=args.num_gpus)
         process_group = parallel_state.get_context_parallel_group()
@@ -130,7 +127,8 @@ def demo(args: argparse.Namespace) -> None:
     )
 
     if args.num_gpus > 1:
-        pipeline.model.net.enable_context_parallel(process_group)
+        distributed.init()
+        parallel_state.initialize_model_parallel(context_parallel_size=args.num_gpus)
 
     generated_output = pipeline.generate(
         action_path=args.action_annotation_path,
@@ -155,6 +153,13 @@ def demo(args: argparse.Namespace) -> None:
     )
 
     log.info(f"Saved video to {video_save_path}")
+
+    # clean up properly
+    if args.num_gpus > 1:
+        parallel_state.destroy_model_parallel()
+        import torch.distributed as dist
+
+        dist.destroy_process_group()
 
     return
 
