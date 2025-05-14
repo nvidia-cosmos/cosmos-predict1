@@ -91,8 +91,6 @@ MODEL_NAME_DICT = {
     "Cosmos-Predict1-7B-WorldInterpolator": "Cosmos_Predict1_WorldInterpolator_7B",
     # video2world action-conditioned
     "Cosmos-Predict1-7B-Video2World_action_post-trained": "Cosmos_Predict1_Video2World_7B_Action_Post_trained",
-    # video2world instruction-conditioned
-    "Cosmos-Predict1-7B-Video2World_instruction_post-trained": "Cosmos_Predict1_Video2World_7B_instruction_Post_trained",
 }
 
 
