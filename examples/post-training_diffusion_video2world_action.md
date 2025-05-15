@@ -170,7 +170,7 @@ CUDA_HOME=$CONDA_PREFIX PYTHONPATH=$(pwd) python cosmos_predict1/diffusion/infer
     --checkpoint_dir checkpoints \
     --diffusion_transformer_dir Cosmos-Predict1-7B-Video2World_action_post-trained \
     --seed 0 \
-    --input_image_or_video_path "datasets/bridge/videos/test/346/rgb.mp4" --action_annotation_path datasets/bridge/annotation/test/346.json \
+    --input_image_or_video_path datasets/bridge/videos/test/346/rgb.mp4 \ --action_annotation_path datasets/bridge/annotation/test/346.json \
     --height 256 \
     --width 320 \
     --fps 3
