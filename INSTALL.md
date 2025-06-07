@@ -9,7 +9,21 @@ cd cosmos-predict1
 Cosmos runs only on Linux systems. We have tested the installation with Ubuntu 24.04, 22.04, and 20.04.
 Cosmos requires the Python version to be `3.10.x`. Please also make sure you have `conda` installed ([instructions](https://docs.conda.io/projects/conda/en/latest/user-guide/install/index.html)).
 
-### Inference
+### Dependency Management
+
+This project defines its dependencies in two files to support different use cases:
+
+- **`requirements.txt`**: This file contains pinned dependencies with exact versions. Use this to create a reproducible environment that mirrors the setup used for the original research. This is the recommended approach for running the provided examples or for post-training to ensure compatibility.
+
+- **`pyproject.toml`**: This file specifies flexible dependency version ranges. This is for users who want to integrate `cosmos-predict1` as a library into a larger Python project. This approach minimizes the chance of conflicts with other packages in your environment.
+
+Choose the installation method below that best suits your needs.
+
+### For Reproducing the Research Environment
+
+These instructions are for setting up a development environment that matches the one used for the research paper.
+
+#### Inference
 
 The below commands creates the `cosmos-predict1` conda environment and installs the dependencies for inference:
 ```bash
@@ -44,7 +58,7 @@ You can test the environment setup for inference with
 CUDA_HOME=$CONDA_PREFIX PYTHONPATH=$(pwd) python scripts/test_environment.py
 ```
 
-### Post-training
+#### Post-training
 
 The below commands creates the `cosmos-predict1` conda environment and installs the dependencies for post-training. This is the same as required for inference but with an additional package `apex` for training with bfloat16.
 ```bash
@@ -68,3 +82,14 @@ You can test the environment setup for post-training with
 ```bash
 CUDA_HOME=$CONDA_PREFIX PYTHONPATH=$(pwd) python scripts/test_environment.py --training
 ```
+
+### For Using as a Library
+
+If you want to use `cosmos-predict1` in your own project, you can install it from the cloned repository. This will use the flexible dependencies from `pyproject.toml`.
+
+```bash
+# From the root of the cosmos-predict1 repository
+pip install .
+```
+
+This will install `cosmos-predict1` and its dependencies. Note that this method may pull different dependency versions than what is in `requirements.txt`, which may be necessary for compatibility with your other project dependencies.
