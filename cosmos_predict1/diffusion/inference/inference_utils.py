@@ -483,7 +483,7 @@ def get_video_batch_for_multiview_model(
         mapped_indices = [0, 1, 2, 4, 5]
         view_indices_conditioning = []
         for v_index in mapped_indices:
-            view_indices_conditioning.append(torch.ones(num_video_frames, device="cuda") * v_index)
+            view_indices_conditioning.append(torch.ones(int(num_video_frames / n_views), device="cuda") * v_index)
         view_indices_conditioning = torch.cat(view_indices_conditioning, dim=0)
         raw_video_batch["view_indices"] = view_indices_conditioning.unsqueeze(0).contiguous()
 
