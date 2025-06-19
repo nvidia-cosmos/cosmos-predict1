@@ -269,7 +269,6 @@ class MultiviewExtensionGeneralDIT(MultiviewGeneralDIT):
             view_embedding = view_embedding.unsqueeze(-1).unsqueeze(-1)  # Shape: [B, D, V, T, 1, 1]
             view_embedding = split_inputs_cp(x=view_embedding, seq_dim=3, cp_group=self.cp_group)
 
-
         if self.add_repeat_frame_embedding:
             if frame_repeat is None:
                 frame_repeat = (

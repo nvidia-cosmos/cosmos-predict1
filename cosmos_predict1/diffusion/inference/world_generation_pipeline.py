@@ -1012,9 +1012,15 @@ class DiffusionText2WorldMultiviewGenerationPipeline(DiffusionText2WorldGenerati
         video = (1.0 + self.model.decode(sample)).clamp(0, 2) / 2  # [B, 3, T, H, W]
         video_segments = einops.rearrange(video, "b c (v t) h w -> b c v t h w", v=self.n_views)
         video_arrangement = [1, 0, 2, 4, 3, 5]
-	    # Fill one blank view for 5view
+        # Fill one blank view for 5view
         if self.n_views == 5:
-            ones_tensor = torch.zeros_like(video_segments[:, :, 0,],).unsqueeze(2)
+            ones_tensor = torch.zeros_like(
+                video_segments[
+                    :,
+                    :,
+                    0,
+                ],
+            ).unsqueeze(2)
             video_segments = torch.cat((video_segments, ones_tensor), dim=2)
             video_arrangement = [1, 0, 2, 3, 5, 4]
         grid_video = torch.stack(
