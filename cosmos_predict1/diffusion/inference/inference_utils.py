@@ -469,6 +469,7 @@ def get_video_batch_for_multiview_model(
             - state_shape (list): Shape of latent state [C,T,H,W] accounting for VAE compression
     """
     n_views = len(prompt_embedding)
+
     prompt_embedding = einops.rearrange(torch.cat(prompt_embedding), "n t d -> (n t) d").unsqueeze(0)
     raw_video_batch = prepare_data_batch(
         height=height,
@@ -477,6 +478,15 @@ def get_video_batch_for_multiview_model(
         fps=fps,
         prompt_embedding=prompt_embedding,
     )
+
+    if n_views == 5:
+        mapped_indices = [0, 1, 2, 4, 5]
+        view_indices_conditioning = []
+        for v_index in mapped_indices:
+            view_indices_conditioning.append(torch.ones(int(num_video_frames / n_views), device="cuda") * v_index)
+        view_indices_conditioning = torch.cat(view_indices_conditioning, dim=0)
+        raw_video_batch["view_indices"] = view_indices_conditioning.unsqueeze(0).contiguous()
+
     if frame_repeat_negative_condition != -1:
         frame_repeat = torch.zeros(n_views)
         frame_repeat[-1] = frame_repeat_negative_condition

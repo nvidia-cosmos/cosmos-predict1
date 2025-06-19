@@ -84,4 +84,3 @@ for _item in [
     Cosmos_Predict1_Video2World_7B_Multiview_post_trained,
 ]:
     cs.store(group="experiment", package="_global_", name=_item["job"]["name"], node=_item)
-

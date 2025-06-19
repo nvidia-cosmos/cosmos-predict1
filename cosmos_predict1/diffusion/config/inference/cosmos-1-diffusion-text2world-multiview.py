@@ -59,10 +59,10 @@ Cosmos_Predict1_Text2World_7B_Multiview_post_trained: LazyDict = LazyDict(
             name="Cosmos_Predict1_Text2World_7B_Multiview_post_trained",
         ),
         model=dict(
-             net=dict(
+            net=dict(
                 n_views=5,
                 view_condition_dim=3,
-                add_repeat_frame_embedding=False, 
+                add_repeat_frame_embedding=False,
             ),
             latent_shape=[
                 16,
