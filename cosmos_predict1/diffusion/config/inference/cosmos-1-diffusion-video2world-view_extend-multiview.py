@@ -23,7 +23,7 @@ Cosmos_Predict1_Video2World_7B_ViewExtend_Multiview: LazyDict = LazyDict(
     dict(
         defaults=[
             "/experiment/Cosmos_Predict1_Text2World_7B_Multiview",
-            {"override /conditioner": "video_cond_frame_repeat"},
+            {"override /conditioner": "view_conditioned_video_frame_repeat_cond"},
             "_self_",
         ],
         job=dict(
