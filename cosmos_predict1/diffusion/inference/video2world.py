@@ -26,7 +26,7 @@ from cosmos_predict1.diffusion.inference.inference_utils import (
     validate_args,
 )
 from cosmos_predict1.diffusion.inference.world_generation_pipeline import DiffusionVideo2WorldGenerationPipeline
-from cosmos_predict1.utils import distributed, log, misc
+from cosmos_predict1.utils import distributed, log, misc, benchmark
 from cosmos_predict1.utils.io import read_prompts_from_file, save_video
 
 torch.enable_grad(False)
@@ -71,6 +71,11 @@ def parse_arguments() -> argparse.Namespace:
         default=1,
         help="Number of input frames for video2world prediction",
         choices=[1, 9],
+    )
+    parser.add_argument(
+        "--benchmark",
+        action="store_true",
+        help="Run the generation in benchmark mode. It means that generation will be rerun a few times and the average generation time will be shown.",
     )
 
     return parser.parse_args()
@@ -130,6 +135,8 @@ def demo(args):
         seed=args.seed,
         num_input_frames=args.num_input_frames,
     )
+    if args.benchmark:
+        pipeline.generate = benchmark.benchmark_decorator()(pipeline.generate)
 
     # Handle multiple prompts if prompt file is provided
     if args.batch_input_path:
