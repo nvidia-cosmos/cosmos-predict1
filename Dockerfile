@@ -16,32 +16,45 @@
 # Use NVIDIA PyTorch container as base image
 FROM nvcr.io/nvidia/pytorch:24.10-py3
 
+# Set environment variables to prevent interactive prompts
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=UTC
+ENV LANG=C.UTF-8
+ENV LC_ALL=C.UTF-8
+
 # Install basic tools
 RUN apt-get update && apt-get install -y git tree ffmpeg wget
 RUN rm /bin/sh && ln -s /bin/bash /bin/sh && ln -s /lib64/libcuda.so.1 /lib64/libcuda.so
+RUN apt-get -y update && apt-get -y install build-essential cmake ninja-build libgl1-mesa-dev ffmpeg
 
-# Copy the cosmos-predict1.yaml and requirements.txt files to the container
-COPY ./cosmos-predict1.yaml /cosmos-predict1.yaml
-COPY ./requirements.txt /requirements.txt
+COPY ./requirements_docker.txt /requirements_docker.txt
+COPY ./scripts/test_environment.py /scripts/test_environment.py
+
+RUN pip install --upgrade pip && pip install cmake ninja
 
 # Install cosmos-predict1 dependencies. This will take a while.
 RUN echo "Installing dependencies. This will take a while..." && \
-    mkdir -p ~/miniconda3 && \
-    wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/miniconda3/miniconda.sh && \
-    bash ~/miniconda3/miniconda.sh -b -u -p ~/miniconda3 && \
-    rm ~/miniconda3/miniconda.sh && \
-    source ~/miniconda3/bin/activate && \
-    conda env create --file /cosmos-predict1.yaml && \
-    conda activate cosmos-predict1 && \
-    pip install --no-cache-dir -r /requirements.txt && \
-    ln -sf $CONDA_PREFIX/lib/python3.10/site-packages/nvidia/*/include/* $CONDA_PREFIX/include/ && \
-    ln -sf $CONDA_PREFIX/lib/python3.10/site-packages/nvidia/*/include/* $CONDA_PREFIX/include/python3.10 && \
-    ln -sf $CONDA_PREFIX/lib/python3.10/site-packages/triton/backends/nvidia/include/* $CONDA_PREFIX/include/ && \
-    pip install transformer-engine[pytorch]==1.12.0 && \
-    git clone https://github.com/NVIDIA/apex && cd apex && \
-    CUDA_HOME=$CONDA_PREFIX pip install -v --disable-pip-version-check --no-cache-dir --no-build-isolation --config-settings "--build-option=--cpp_ext" --config-settings "--build-option=--cuda_ext" . && \
-    echo "Environment setup complete"
+    echo "Original PyTorch version: $(python -c 'import torch; print(torch.__version__)')" && \
+    echo "Preserving original PyTorch version from base container..." && \
+    pip install --no-cache-dir --upgrade-strategy only-if-needed -r /requirements_docker.txt && \
+    echo "Done installing base dependencies"
 
+# Install transformer-engine 1.12.0 with proper library path setup
+RUN echo "Installing transformer-engine 1.12.0 with library path fix..." && \
+    pip uninstall -y transformer-engine && \
+    pip install --no-cache-dir --no-build-isolation transformer-engine[pytorch]==1.12.0 && \
+    ldconfig && \
+    echo "Transformer-engine 1.12.0 installed"
+
+# Set library paths as environment variables
+ENV LD_LIBRARY_PATH="/usr/local/cuda/lib64:/usr/lib/x86_64-linux-gnu:/usr/local/lib/python3.10/dist-packages/transformer_engine:${LD_LIBRARY_PATH}"
+ENV PYTHONPATH="/usr/local/lib/python3.10/dist-packages:${PYTHONPATH}"
+
+# Verify installation works
+RUN nvcc --version && \
+    echo "=== Version Verification ===" && \
+    python /scripts/test_environment.py && \
+    echo "✅ All libraries verified successfully with preserved PyTorch version"
 
 # Default command
 CMD ["/bin/bash"]

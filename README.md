@@ -3,7 +3,7 @@
 </p>
 
 <h1 align="center">
-    
+
 > 🚨 **Update Notice**  
 >
 > The latest version of our Cosmos-Predict is now live!
