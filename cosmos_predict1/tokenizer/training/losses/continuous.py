@@ -27,7 +27,7 @@ from cosmos_predict1.tokenizer.training.losses import ReduceMode
 from cosmos_predict1.tokenizer.training.losses.lpips import LPIPS
 from cosmos_predict1.utils.lazy_config import instantiate
 
-_VALID_LOSS_NAMES = ["color", "perceptual", "flow", "kl", "video_consistency"]
+_VALID_LOSS_NAMES = ["color", "perceptual", "flow", "kl", "video_consistency", "high_frequency"]
 VIDEO_CONSISTENCY_LOSS = "video_consistency"
 RECON_CONSISTENCY_KEY = f"{RECON_KEY}_consistency"
 
@@ -46,17 +46,12 @@ class TokenizerLoss(nn.Module):
         loss = dict()
         total_loss = 0.0
 
-        inputs[MASK_KEY] = torch.ones_like(inputs[INPUT_KEY])
         # Calculates reconstruction losses (`total_loss`).
         for key, module in self.loss_modules.items():
             curr_loss = module(inputs, output_batch, iteration)
             loss.update({k: torch.mean(v) for k, v in curr_loss.items()})
             total_loss += sum([self.reduce(v) if (v.dim() > 0) else v for v in curr_loss.values()])
 
-        loss.update({k: torch.mean(v) for k, v in curr_loss.items()})
-
-        # Computes the overall loss as sum of the reconstruction losses and the generator loss.
-        total_loss += sum([self.reduce(v) if (v.dim() > 0) else v for v in curr_loss.values()])
         return dict(loss=loss), total_loss
 
 
@@ -94,6 +89,49 @@ class ColorLoss(torch.nn.Module):
         if torch.isnan(color_weighted).any():
             raise ValueError("[COLOR] NaN detected in loss")
         return dict(color=color_weighted)
+
+
+class HighFrequencyLoss(torch.nn.Module):
+    """High-frequency detail loss using a Laplacian filter to preserve edges, fingers, and facial features."""
+
+    def __init__(self, config) -> None:
+        super().__init__()
+        self.schedule = WeightScheduler(boundaries=config.boundaries, values=config.values)
+        laplacian_kernel = torch.tensor(
+            [[0, 1, 0], [1, -4, 1], [0, 1, 0]], dtype=torch.float32
+        ).unsqueeze(0).unsqueeze(0)  # (1, 1, 3, 3)
+        self.register_buffer("laplacian_kernel", laplacian_kernel)
+
+    def _extract_hf(self, x: torch.Tensor) -> torch.Tensor:
+        """Apply Laplacian filter per channel via grouped convolution."""
+        C = x.shape[1]
+        kernel = self.laplacian_kernel.repeat(C, 1, 1, 1)  # (C, 1, 3, 3)
+        return F.conv2d(x, kernel, padding=1, groups=C)
+
+    def forward(self, inputs, output_batch, iteration) -> dict[str, torch.Tensor]:
+        weight = self.schedule(iteration)
+        if weight == 0:
+            return dict()
+
+        input_images = inputs[INPUT_KEY]
+        reconstructions = output_batch[RECON_KEY]
+        mask = inputs[MASK_KEY]
+
+        # Reshape (B, C, T, H, W) → (B*T, C, H, W) for 2D convolution
+        if input_images.ndim == 5:
+            B, C, T, H, W = input_images.shape
+            input_2d = input_images.permute(0, 2, 1, 3, 4).reshape(B * T, C, H, W)
+            recon_2d = reconstructions.permute(0, 2, 1, 3, 4).reshape(B * T, C, H, W)
+            mask_2d = mask.permute(0, 2, 1, 3, 4).reshape(B * T, mask.shape[1], H, W)
+        else:
+            input_2d, recon_2d, mask_2d = input_images, reconstructions, mask
+
+        hf_diff = torch.abs(self._extract_hf(input_2d) - self._extract_hf(recon_2d))
+        loss = weight * (hf_diff * mask_2d).sum() / (mask_2d.sum() + 1e-8)
+
+        if torch.isnan(loss):
+            raise ValueError("[HIGH_FREQUENCY] NaN detected in loss")
+        return dict(high_frequency=loss)
 
 
 class KLLoss(torch.nn.Module):
