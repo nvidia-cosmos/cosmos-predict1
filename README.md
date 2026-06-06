@@ -1,5 +1,5 @@
 > [!IMPORTANT]
-> ## 🚀 Cosmos 3 Has Arrived
+> ## 🚀 [Cosmos 3 Has Arrived](https://github.com/NVIDIA/Cosmos)
 >
 > Cosmos 3 is NVIDIA's next-generation foundation model platform for Physical AI. Compared with Cosmos-Predict1, Cosmos 3 delivers significantly stronger world prediction capabilities, producing more accurate, coherent, and physically grounded future-state predictions across a wide range of environments and embodiments.
 >
