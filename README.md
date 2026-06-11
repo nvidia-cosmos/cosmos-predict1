@@ -51,7 +51,7 @@ We provide a comphrehensive set of examples to illustrate how to perform inferen
 
 ### Installation
 
-Please refer to [INSTALL.md](INSTALL.md) for general instructions on environment setup.
+Please refer to [INSTALL.md](INSTALL.md) for detailed instructions on environment setup and dependency management. This document explains how to install for both reproducibility and for use as a library.
 
 ### Inference with pre-trained Cosmos-Predict1 models
 * [Inference with diffusion-based Text2World models](/examples/inference_diffusion_text2world.md) **[with multi-GPU support]**
