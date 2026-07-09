@@ -33,7 +33,7 @@ from megatron.core import parallel_state
 
 from cosmos_predict1.diffusion.inference.inference_utils import add_common_arguments, check_input_frames, validate_args
 from cosmos_predict1.diffusion.inference.world_generation_pipeline import DiffusionWorldInterpolatorGenerationPipeline
-from cosmos_predict1.utils import distributed, log, misc
+from cosmos_predict1.utils import distributed, log, misc, benchmark
 from cosmos_predict1.utils.io import read_prompts_from_file, save_video
 
 torch.enable_grad(False)
@@ -99,6 +99,11 @@ def parse_arguments() -> argparse.Namespace:
         "frame pair is processed (e.g., (x0, x1) for step_size=1, (x0, x2) for step_size=2). Higher values allow processing more "
         "pairs up to the maximum possible with the given step_size.",
     )
+    parser.add_argument(
+        "--benchmark",
+        action="store_true",
+        help="Run the generation in benchmark mode. It means that generation will be rerun a few times and the average generation time will be shown.",
+    )
     return parser.parse_args()
 
 
@@ -157,6 +162,8 @@ def demo(args):
         num_frame_pairs=args.num_frame_pairs,
         frame_stride=args.frame_stride,
     )
+    if args.benchmark:
+        pipeline.generate = benchmark.benchmark_decorator()(pipeline.generate)
 
     # Handle multiple prompts if prompt file is provided
     if args.batch_input_path:

@@ -21,7 +21,7 @@ from megatron.core import parallel_state
 
 from cosmos_predict1.diffusion.inference.inference_utils import add_common_arguments, remove_argument, validate_args
 from cosmos_predict1.diffusion.inference.world_generation_pipeline import DiffusionVideo2WorldActionGenerationPipeline
-from cosmos_predict1.utils import distributed, log, misc
+from cosmos_predict1.utils import distributed, log, misc, benchmark
 from cosmos_predict1.utils.io import save_video
 
 torch.enable_grad(False)
@@ -74,6 +74,11 @@ def parse_arguments() -> argparse.Namespace:
         default=1,
         help="Number of loops to generate video",
     )
+    parser.add_argument(
+        "--benchmark",
+        action="store_true",
+        help="Run the generation in benchmark mode. It means that generation will be rerun a few times and the average generation time will be shown.",
+    )
 
     return parser.parse_args()
 
@@ -124,6 +129,8 @@ def demo(args: argparse.Namespace) -> None:
         seed=args.seed,
         num_input_frames=args.num_input_frames,
     )
+    if args.benchmark:
+        pipeline.generate = benchmark.benchmark_decorator()(pipeline.generate)
 
     generated_output = pipeline.generate(
         action_path=args.action_annotation_path,

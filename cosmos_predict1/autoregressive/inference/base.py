@@ -21,7 +21,7 @@ import torch
 
 from cosmos_predict1.autoregressive.inference.world_generation_pipeline import ARBaseGenerationPipeline
 from cosmos_predict1.autoregressive.utils.inference import add_common_arguments, load_vision_input, validate_args
-from cosmos_predict1.utils import log
+from cosmos_predict1.utils import log, benchmark
 
 
 def parse_args():
@@ -34,6 +34,11 @@ def parse_args():
         default="Cosmos-Predict1-4B",
     )
     parser.add_argument("--input_type", type=str, default="video", help="Type of input", choices=["image", "video"])
+    parser.add_argument(
+        "--benchmark",
+        action="store_true",
+        help="Run the generation in benchmark mode. It means that generation will be rerun a few times and the average generation time will be shown.",
+    )
     args = parser.parse_args()
     return args
 
@@ -84,6 +89,8 @@ def main(args):
         disable_guardrail=args.disable_guardrail,
         parallel_size=args.num_gpus,
     )
+    if args.benchmark:
+        pipeline.generate = benchmark.benchmark_decorator()(pipeline.generate)
 
     # Load input image(s) or video(s)
     input_videos = load_vision_input(
