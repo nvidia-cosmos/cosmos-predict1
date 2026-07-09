@@ -31,6 +31,8 @@ RUN echo "Installing dependencies. This will take a while..." && \
     bash ~/miniconda3/miniconda.sh -b -u -p ~/miniconda3 && \
     rm ~/miniconda3/miniconda.sh && \
     source ~/miniconda3/bin/activate && \
+    conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main && \
+    conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r && \
     conda env create --file /cosmos-predict1.yaml && \
     conda activate cosmos-predict1 && \
     pip install --no-cache-dir -r /requirements.txt && \
@@ -42,6 +44,7 @@ RUN echo "Installing dependencies. This will take a while..." && \
     CUDA_HOME=$CONDA_PREFIX pip install -v --disable-pip-version-check --no-cache-dir --no-build-isolation --config-settings "--build-option=--cpp_ext" --config-settings "--build-option=--cuda_ext" . && \
     echo "Environment setup complete"
 
+RUN echo "source ~/miniconda3/bin/activate cosmos-predict1" >> ~/.bashrc
 
 # Default command
 CMD ["/bin/bash"]
